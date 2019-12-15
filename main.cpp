@@ -18,6 +18,7 @@
 #include <map> 
 #include <ctime>
 
+
 using namespace std;
 int total_emission = 0;
 
@@ -27,9 +28,9 @@ class Edge {
 	public: string to_vertice;
 	private: int h;
 	private: int p;
-	static sem_t gate;
+	static	mutex mtx;
 
-	Edge(string from_vertice, string to_vertice, int h, int p) 
+	public: Edge(string from_vertice, string to_vertice, int h, int p) 
     { 
         this->from_vertice = from_vertice; 
         this->to_vertice = to_vertice;
@@ -38,31 +39,31 @@ class Edge {
     }
 
 	public: void enter(){
-		sem_wait(&gate);
+		Edge::mtx.lock();
 		total_emission += this->emission();
-		sem_post(&gate);
+		Edge::mtx.unlock();
 	}
 
-	private: int emission()
+	public: int emission()
 	{
 		int sum = 0;
 		for (int k = 0; k <= 10000000; ++k)
 			sum += k / (this->p * this->h * 1000000);
 		return sum;	
 	}
-
-	public: string epoch_time()
-	{
-		time_t rawtime;
-		struct tm * timeinfo;
-		char buffer[80];
-		time (&rawtime);
-		timeinfo = localtime(&rawtime);
-		strftime(buffer,sizeof(buffer),"%d-%m-%Y %H:%M:%S",timeinfo);
-		std::string str(buffer);
-		return str;
-	}
 };
+
+string epoch_time()
+{
+	time_t rawtime;
+	struct tm * timeinfo;
+	char buffer[80];
+	time (&rawtime);
+	timeinfo = localtime(&rawtime);
+	strftime(buffer,sizeof(buffer),"%d-%m-%Y %H:%M:%S",timeinfo);
+	std::string str(buffer);
+	return str;
+}
 
 template<typename Out>
 void split(const string &s, char delim, Out result) {
@@ -87,6 +88,24 @@ int get_rand(int lowest=1, int highest=10)
 	return rand() % range + 1;
 }
 
+void pass(std::vector<Edge*> edges, int path_num, int car_num)
+{
+	string entry_time = epoch_time();
+	string exit_time;
+	int path_emission = 0;
+	for (Edge* edge : edges){
+		edge->enter();
+		path_emission += edge->emission();
+	}
+	exit_time = epoch_time();
+	cout << "path_num: " << path_num << "\n car_num: " << car_num 
+	<< "\n entry_time: " << entry_time << "\n path_emission:" << path_emission
+	<< "\n exit_time: " << exit_time << "\n total_emission:" << total_emission
+	<< "-----------------------------------------------" << endl; 
+	//write to file
+}
+
+
 int main()
 {
 	ifstream infile("input");
@@ -109,6 +128,7 @@ int main()
     			v.push_back(items[0]);
     			v.push_back(items[1]);
     			dict.insert(pair<vector<string>, int>(v, strtoi(items[2])));
+    			// cout << items[0] << items[1] << dict[v] << endl;
             }else{
             	if (is_next_input == 1)
             	{
@@ -121,6 +141,7 @@ int main()
             			int car_counter = 0;
             			is_second_line = 0;
             			int cars_num = strtoi(items[0]);
+            			thread threads[cars_num];
             			for (int i = 0; i < cars_num; ++i)
             			{
             				int p = get_rand();
@@ -145,7 +166,8 @@ int main()
             				}
             				car_counter++;
 
-            				//create thread to run pass function
+            				threads[i] = thread(pass, car_path, path_counter, car_counter);
+            				threads[i].join();
 
             			}
             		}
