@@ -1,4 +1,4 @@
-// Ensure that only one thread at a time can run a method of my C++ class.
+// Ensure that only one thread at a time can run a method of my class.
 // In other words, make the class behave like a Monitor.
 
 #include <iostream>
@@ -18,8 +18,8 @@
 #include <map> 
 #include <ctime>
 
-
 using namespace std;
+
 int total_emission = 0;
 
 class Edge {
@@ -28,7 +28,6 @@ class Edge {
 	public: string to_vertice;
 	private: int h;
 	private: int p;
-	static	mutex mtx;
 
 	public: Edge(string from_vertice, string to_vertice, int h, int p) 
     { 
@@ -39,16 +38,19 @@ class Edge {
     }
 
 	public: void enter(){
-		Edge::mtx.lock();
+        // cv.wait(lck);
 		total_emission += this->emission();
-		Edge::mtx.unlock();
+        // cv.notify_one();
 	}
 
 	public: int emission()
 	{
 		int sum = 0;
-		for (int k = 0; k <= 10000000; ++k)
-			sum += k / (this->p * this->h * 1000000);
+		for (int k = 0; k <= 10000000; ++k){
+			int term = (this->p * this->h * 1000000); 
+			if (k >= term and term != 0)
+				sum += k / term;
+		}
 		return sum;	
 	}
 };
@@ -60,8 +62,8 @@ string epoch_time()
 	char buffer[80];
 	time (&rawtime);
 	timeinfo = localtime(&rawtime);
-	strftime(buffer,sizeof(buffer),"%d-%m-%Y %H:%M:%S",timeinfo);
-	std::string str(buffer);
+	strftime(buffer, sizeof(buffer), "%d-%m-%Y %H:%M:%S", timeinfo);
+	string str(buffer);
 	return str;
 }
 
@@ -81,6 +83,20 @@ int strtoi(string item)
     return d;
 }
 
+string itos(int number)
+{
+    if (number == 0)
+    {
+        return "0";
+    }
+    string snum;
+    while(number > 0){
+        snum = char(number%10 + '0') + snum;
+        number = number/10;
+    }
+    return snum;
+}
+
 int get_rand(int lowest=1, int highest=10)
 {
 	srand((int)time(0));
@@ -88,23 +104,36 @@ int get_rand(int lowest=1, int highest=10)
 	return rand() % range + 1;
 }
 
-void pass(std::vector<Edge*> edges, int path_num, int car_num)
+void pass(std::vector<Edge*> edges, int path_num, int car_num, int cars_num)
 {
 	string entry_time = epoch_time();
 	string exit_time;
 	int path_emission = 0;
-	for (Edge* edge : edges){
-		edge->enter();
-		path_emission += edge->emission();
+	for (int i = 0; i < edges.size(); ++i)
+	{
+		// edges[i]->enter();
+		path_emission += edges[i]->emission();
 	}
-	exit_time = epoch_time();
-	cout << "path_num: " << path_num << "\n car_num: " << car_num 
-	<< "\n entry_time: " << entry_time << "\n path_emission:" << path_emission
-	<< "\n exit_time: " << exit_time << "\n total_emission:" << total_emission
-	<< "-----------------------------------------------" << endl; 
-	//write to file
-}
 
+	exit_time = epoch_time();
+    total_emission += path_emission;
+
+	// cout << "path_num: " << path_num << "\n car_num: " << car_num 
+	// << "\n entry_time: " << entry_time << "\n path_emission:" << path_emission
+	// << "\n exit_time: " << exit_time << "\n total_emission:" << total_emission
+	// << "\n enter_node: " << edges[0]->from_vertice
+	// << "\n exit_node: " << edges[edges.size() - 1]->to_vertice 
+	// << "\n---------------------------------------------------" << endl; 
+    
+	ofstream outFile(itos(path_num) + "-" + itos(car_num), ios::out);
+    outFile << edges[0]->from_vertice << ", "
+    << entry_time << ", "
+    << edges[edges.size() - 1]->to_vertice  << ", "
+    << exit_time << ", "
+    << path_emission << ", "
+    << total_emission << endl;
+    outFile.close();
+}
 
 int main()
 {
@@ -144,7 +173,7 @@ int main()
             			thread threads[cars_num];
             			for (int i = 0; i < cars_num; ++i)
             			{
-            				int p = get_rand();
+            				int p = (get_rand() * car_counter) % 10 + 1;
             				std::vector<Edge *> car_path;
             				int is_first_node = 0;
             				string tmp;
@@ -166,7 +195,7 @@ int main()
             				}
             				car_counter++;
 
-            				threads[i] = thread(pass, car_path, path_counter, car_counter);
+            				threads[i] = thread(pass, car_path, path_counter, car_counter, cars_num);
             				threads[i].join();
 
             			}
