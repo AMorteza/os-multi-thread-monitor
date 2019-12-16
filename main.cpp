@@ -99,16 +99,16 @@ int get_rand(int lowest=1, int highest=10)
 
 void pass(std::vector<Monitor*> edges, int p, int path_num, int car_num, int cars_num)
 {
-    mtx.lock();	
 	string entry_time = itos(time(0));
 	string exit_time;
 	int path_emission = 0;
+    mtx.lock();	
 	for (int i = 0; i < edges.size(); ++i)
 		path_emission += edges[i]->enter(p);
-	exit_time = itos(time(0));
     total_emission += path_emission;
     counter++;
     mtx.unlock();
+	exit_time = itos(time(0));
 
     if (counter < cars_num)
     	sem_wait(&total_em);
