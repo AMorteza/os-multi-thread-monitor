@@ -24,7 +24,7 @@ int total_emission = 0;
 int counter = 0;
 mutex mtx;
 sem_t total_em;
-sem_t total_em_2;
+sem_t total_em_write;
 
 class Monitor {
   
@@ -134,8 +134,8 @@ void pass(std::vector<Monitor*> edges, int p, int path_num, int car_num, int car
     mtx.unlock();
 
     if (counter > 0)
-    	sem_wait(&total_em_2);
-    sem_post(&total_em_2);
+    	sem_wait(&total_em_write);
+    sem_post(&total_em_write);
 
     mtx.lock();    
 	ofstream outFile(itos(path_num) + "-" + itos(car_num), ios::out);
@@ -147,13 +147,16 @@ void pass(std::vector<Monitor*> edges, int p, int path_num, int car_num, int car
     << total_emission << endl;
     outFile.close();
     mtx.unlock();
+
+    sem_init(&total_em, 0, 0);
+    sem_init(&total_em_write, 0, 0);
 }
 
 int main()
 {
 	ifstream infile("input");
     sem_init(&total_em, 0, 0);
-    sem_init(&total_em_2, 0, 0);
+    sem_init(&total_em_write, 0, 0);
 
 	if (infile.good())
     {
