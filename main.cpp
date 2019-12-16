@@ -60,18 +60,6 @@ class Monitor {
 	}
 };
 
-string epoch_time()
-{
-	time_t rawtime;
-	struct tm * timeinfo;
-	char buffer[80];
-	time (&rawtime);
-	timeinfo = localtime(&rawtime);
-	strftime(buffer, sizeof(buffer), "%d-%m-%Y %H:%M:%S", timeinfo);
-	string str(buffer);
-	return str;
-}
-
 template<typename Out>
 void split(const string &s, char delim, Out result) {
     stringstream ss(s);
@@ -112,15 +100,12 @@ int get_rand(int lowest=1, int highest=10)
 void pass(std::vector<Monitor*> edges, int p, int path_num, int car_num, int cars_num)
 {
     mtx.lock();	
-	string entry_time = epoch_time();
+	string entry_time = itos(time(0));
 	string exit_time;
 	int path_emission = 0;
 	for (int i = 0; i < edges.size(); ++i)
-	{
 		path_emission += edges[i]->enter(p);
-	}
-
-	exit_time = epoch_time();
+	exit_time = itos(time(0));
     total_emission += path_emission;
     counter++;
     mtx.unlock();
