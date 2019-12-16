@@ -21,33 +21,34 @@
 using namespace std;
 
 int total_emission = 0;
+int counter = 0;
+mutex mtx;
+sem_t total_em;
+sem_t total_em_2;
 
-class Edge {
+class Monitor {
   
 	public: string from_vertice;
 	public: string to_vertice;
-	private: int h;
-	private: int p;
+	public: int h;
 
-	public: Edge(string from_vertice, string to_vertice, int h, int p) 
+	public: Monitor(string from_vertice, string to_vertice, int h) 
     { 
         this->from_vertice = from_vertice; 
         this->to_vertice = to_vertice;
         this->h = h;
-        this->p = p; 
     }
 
 	public: void enter(){
         // cv.wait(lck);
-		total_emission += this->emission();
         // cv.notify_one();
 	}
 
-	public: int emission()
+	public: int emission(int p)
 	{
 		int sum = 0;
 		for (int k = 0; k <= 10000000; ++k){
-			int term = (this->p * this->h * 1000000); 
+			int term = (p * this->h * 1000000); 
 			if (k >= term and term != 0)
 				sum += k / term;
 		}
@@ -104,27 +105,36 @@ int get_rand(int lowest=1, int highest=10)
 	return rand() % range + 1;
 }
 
-void pass(std::vector<Edge*> edges, int path_num, int car_num, int cars_num)
+void pass(std::vector<Monitor*> edges, int p, int path_num, int car_num, int cars_num)
 {
+    mtx.lock();	
 	string entry_time = epoch_time();
 	string exit_time;
 	int path_emission = 0;
 	for (int i = 0; i < edges.size(); ++i)
 	{
 		// edges[i]->enter();
-		path_emission += edges[i]->emission();
+		path_emission += edges[i]->emission(p);
 	}
 
 	exit_time = epoch_time();
     total_emission += path_emission;
+    counter++;
+    mtx.unlock();
 
-	// cout << "path_num: " << path_num << "\n car_num: " << car_num 
-	// << "\n entry_time: " << entry_time << "\n path_emission:" << path_emission
-	// << "\n exit_time: " << exit_time << "\n total_emission:" << total_emission
-	// << "\n enter_node: " << edges[0]->from_vertice
-	// << "\n exit_node: " << edges[edges.size() - 1]->to_vertice 
-	// << "\n---------------------------------------------------" << endl; 
-    
+    if (counter < cars_num)
+    	sem_wait(&total_em);
+    sem_post(&total_em);
+
+    mtx.lock();    
+    counter--;	
+    mtx.unlock();
+
+    if (counter > 0)
+    	sem_wait(&total_em_2);
+    sem_post(&total_em_2);
+
+    mtx.lock();    
 	ofstream outFile(itos(path_num) + "-" + itos(car_num), ios::out);
     outFile << edges[0]->from_vertice << ", "
     << entry_time << ", "
@@ -133,11 +143,15 @@ void pass(std::vector<Edge*> edges, int path_num, int car_num, int cars_num)
     << path_emission << ", "
     << total_emission << endl;
     outFile.close();
+    mtx.unlock();
 }
 
 int main()
 {
 	ifstream infile("input");
+    sem_init(&total_em, 0, 0);
+    sem_init(&total_em_2, 0, 0);
+
 	if (infile.good())
     {
         vector<vector<string>> inputs;  
@@ -146,6 +160,7 @@ int main()
         int is_second_line = 0;    
         vector<string> path;
     	map<vector<string>, int> dict;
+		vector<Monitor *> monitors;    	
     	int path_counter = 0;
         while (getline(infile, line))
         {
@@ -157,7 +172,7 @@ int main()
     			v.push_back(items[0]);
     			v.push_back(items[1]);
     			dict.insert(pair<vector<string>, int>(v, strtoi(items[2])));
-    			// cout << items[0] << items[1] << dict[v] << endl;
+    			monitors.push_back(new Monitor(items[0], items[1], strtoi(items[2])));
             }else{
             	if (is_next_input == 1)
             	{
@@ -173,32 +188,40 @@ int main()
             			thread threads[cars_num];
             			for (int i = 0; i < cars_num; ++i)
             			{
-            				int p = (get_rand() * car_counter) % 10 + 1;
-            				std::vector<Edge *> car_path;
+            				int car_rand = (get_rand() * car_counter) % 10 + 1;
+            				std::vector<Monitor *> car_path;
             				int is_first_node = 0;
-            				string tmp;
+            				string prev;
             				for (string node : path)
             				{
             					if (is_first_node == 0)
             					{
-            						tmp = node;
+            						prev = node;
             						is_first_node = 1;
             					}else{
             						vector<string> v;
-    								v.push_back(tmp);
+    								v.push_back(prev);
     								v.push_back(node);
             						int h = dict[v];
-            						car_path.push_back(new Edge(tmp, node, h, p));
-            						tmp = node;
+            						for (int k = 0; k < monitors.size(); ++k)
+            						{
+            							if (strcmp(monitors[k]->from_vertice.c_str(), prev.c_str()) == 0 
+        								and strcmp(monitors[k]->to_vertice.c_str(), node.c_str()) == 0
+        								and monitors[k]->h == h)
+            							{
+            								car_path.push_back(monitors[k]);
+            								break;
+            							}
+            						}
+            						prev = node;
             					}
-            				
             				}
             				car_counter++;
-
-            				threads[i] = thread(pass, car_path, path_counter, car_counter, cars_num);
-            				threads[i].join();
-
+            				threads[i] = thread(pass, car_path, car_rand, path_counter, car_counter, cars_num);            				
             			}
+
+            			for (int j = 0; j < cars_num; j++)
+        					threads[j].join();
             		}
             	}
             	is_next_input = 1;
