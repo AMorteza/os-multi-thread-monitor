@@ -31,6 +31,7 @@ class Monitor {
 	public: string from_vertice;
 	public: string to_vertice;
 	public: int h;
+	private: mutex gate;
 
 	public: Monitor(string from_vertice, string to_vertice, int h) 
     { 
@@ -39,9 +40,12 @@ class Monitor {
         this->h = h;
     }
 
-	public: void enter(){
-        // cv.wait(lck);
-        // cv.notify_one();
+	public: int enter(int p){
+		int emission; 
+		this->gate.lock();
+		emission = this->emission(p);
+		this->gate.unlock();
+		return emission;
 	}
 
 	public: int emission(int p)
@@ -113,8 +117,7 @@ void pass(std::vector<Monitor*> edges, int p, int path_num, int car_num, int car
 	int path_emission = 0;
 	for (int i = 0; i < edges.size(); ++i)
 	{
-		// edges[i]->enter();
-		path_emission += edges[i]->emission(p);
+		path_emission += edges[i]->enter(p);
 	}
 
 	exit_time = epoch_time();
