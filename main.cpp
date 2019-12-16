@@ -31,20 +31,26 @@ class Monitor {
 	public: string from_vertice;
 	public: string to_vertice;
 	public: int h;
-	private: mutex gate;
+	public: int cv;
+	private: sem_t gate; 
 
 	public: Monitor(string from_vertice, string to_vertice, int h) 
     { 
         this->from_vertice = from_vertice; 
         this->to_vertice = to_vertice;
         this->h = h;
+        this->cv = 0;
+    	sem_init(&this->gate, 0, 0);
+
     }
 
 	public: int enter(int p){
-		int emission; 
-		this->gate.lock();
+		int emission;
+		if (this->cv == 1)
+    		sem_wait(&this->gate);
+	    sem_post(&this->gate);
+	    this->cv = 1;
 		emission = this->emission(p);
-		this->gate.unlock();
 		return emission;
 	}
 
@@ -103,8 +109,10 @@ void pass(std::vector<Monitor*> edges, int p, int path_num, int car_num, int car
 	string exit_time;
 	int path_emission = 0;
     mtx.lock();	
-	for (int i = 0; i < edges.size(); ++i)
+	for (int i = 0; i < edges.size(); ++i){
 		path_emission += edges[i]->enter(p);
+		edges[i]->cv = 0;
+	}
     total_emission += path_emission;
     counter++;
     mtx.unlock();
