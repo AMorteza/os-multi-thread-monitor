@@ -66,6 +66,20 @@ class Monitor {
 	}
 };
 
+class Run {
+	public: vector<Monitor*> car_path;
+	public: int car_rand;
+	public: int path_num;
+	public: int car_num;
+	public: Run(vector<Monitor*> car_path, int car_rand, int path_num, int car_num)
+	{
+		this->car_path = car_path;
+		this->car_rand = car_rand;
+		this->path_num = path_num;
+		this->car_num = car_num;
+	}
+};
+
 template<typename Out>
 void split(const string &s, char delim, Out result) {
     stringstream ss(s);
@@ -153,7 +167,7 @@ int main()
 
 	if (infile.good())
     {
-        vector<vector<string>> inputs;  
+        vector<Run*> runs;
         string line;
         int is_next_input = 0;
         int is_second_line = 0;    
@@ -184,7 +198,6 @@ int main()
             			int car_counter = 0;
             			is_second_line = 0;
             			int cars_num = strtoi(items[0]);
-            			thread threads[cars_num];
             			for (int i = 0; i < cars_num; ++i)
             			{
             				int car_rand = (get_rand() * car_counter) % 10 + 1;
@@ -216,17 +229,19 @@ int main()
             					}
             				}
             				car_counter++;
-            				threads[i] = thread(pass, car_path, car_rand, path_counter, car_counter, cars_num);            				
+        					runs.push_back(new Run(car_path, car_rand, path_counter, car_counter));
             			}
 
-            			for (int j = 0; j < cars_num; j++)
-        					threads[j].join();
             		}
             	}
             	is_next_input = 1;
             }
         }
-           
+		thread threads[runs.size()];
+		for (int i = 0; i < runs.size(); ++i)
+			threads[i] = thread(pass, runs[i]->car_path, runs[i]->car_rand, runs[i]->path_num, runs[i]->car_num, runs.size());            				
+		for (int j = 0; j < runs.size(); j++)
+			threads[j].join();
     }else
         cout << "input file not exists!" << endl;
     return 0;
