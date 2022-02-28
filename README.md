@@ -6,5 +6,12 @@ Run:
 
 `./main.out`
 
+Clean files:
+
 `make clean`
+
+
+* Any Question? 
+Feel free to feedback amh.morteza@gmail.com
+
 
